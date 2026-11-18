@@ -222,3 +222,6 @@ _local_shots/
 _healthcheck/
 *.db-shm
 *.db-wal
+
+# 线上后台查询脚本（含 admin 密码，仅本地）
+check_trial_usage.mjs
