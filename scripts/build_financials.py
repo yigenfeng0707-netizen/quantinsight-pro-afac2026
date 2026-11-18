@@ -114,23 +114,51 @@ def fetch_one(code: str) -> list[dict]:
     return rows
 
 
+def _default_db() -> Path:
+    """数据库路径自适应：仓库根 scripts/ 或部署 payload /app/scripts/ 均可用。"""
+    here = Path(__file__).resolve().parent.parent
+    for cand in (here / "data" / "qi_data.db",          # payload: /app/scripts → /app/data
+                 here / "streamlit_app" / "data" / "qi_data.db"):  # 本地仓库根
+        if cand.exists():
+            return cand
+    return here / "data" / "qi_data.db"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--db", type=Path,
-                    default=Path(__file__).parent.parent / "streamlit_app" / "data" / "qi_data.db")
+    ap.add_argument("--db", type=Path, default=None,
+                    help="默认自适应定位 qi_data.db")
     ap.add_argument("--codes", default="", help="逗号分隔代码列表（默认核心标的）")
     ap.add_argument("--all", action="store_true", help="覆盖 stock_history 全部代码")
     ap.add_argument("--all-periods", action="store_true", help="保留季报/半年报（默认只年报）")
     ap.add_argument("--sleep", type=float, default=0.6, help="每只标的间隔秒数")
+    ap.add_argument("--skip-if-rows", type=int, default=0,
+                    help="库中已有 >= 该行数时直接退出（容器启动幂等引导用，0=不跳过）")
     ap.add_argument("--mock", action="store_true",
                     help="管线自检：写合成数据行（source 标记 selftest_mock），供本地验证")
     args = ap.parse_args()
 
+    args.db = args.db or _default_db()
     if not args.db.exists():
         sys.exit(f"找不到数据库：{args.db}")
 
-    sys.path.insert(0, str(Path(__file__).parent.parent / "streamlit_app"))
-    from features.sqlite_data_layer import QIDataDB  # noqa: E402
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    try:
+        from features.sqlite_data_layer import QIDataDB  # noqa: E402
+    except ImportError:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "streamlit_app"))
+        from features.sqlite_data_layer import QIDataDB  # noqa: E402
+
+    if args.skip_if_rows > 0:
+        conn = sqlite3.connect(f"file:{args.db}?mode=ro", uri=True)
+        try:
+            n = conn.execute("SELECT COUNT(*) FROM financials").fetchone()[0]
+        except sqlite3.OperationalError:
+            n = 0
+        conn.close()
+        if n >= args.skip_if_rows:
+            log.info("financials 已有 %d 行（>= %d），跳过引导", n, args.skip_if_rows)
+            return 0
 
     # 选码
     if args.all:

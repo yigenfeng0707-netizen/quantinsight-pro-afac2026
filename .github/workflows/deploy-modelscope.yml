@@ -73,6 +73,9 @@ jobs:
             streamlit_app/ studio/
           # 部署配置（Dockerfile / ms_deploy.json）
           cp deploy/modelscope/* studio/
+          # 财报引导脚本（容器启动后台拉取 financials）
+          mkdir -p studio/scripts
+          cp scripts/build_financials.py studio/scripts/
           echo "--- payload ---"
           du -sh studio/
 

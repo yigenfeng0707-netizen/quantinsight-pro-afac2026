@@ -23,4 +23,5 @@ EXPOSE 7860
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
     CMD curl -sf http://localhost:7860/ || exit 1
 
-CMD ["streamlit", "run", "app.py", "--server.port=7860", "--server.address=0.0.0.0", "--server.headless=true"]
+# 启动：后台引导财报入库（幂等，失败不影响应用），前台 streamlit
+CMD ["sh", "-c", "mkdir -p logs && (python scripts/build_financials.py --skip-if-rows 150 --sleep 0.5 > logs/fin_bootstrap.log 2>&1 &) ; exec streamlit run app.py --server.port=7860 --server.address=0.0.0.0 --server.headless=true"]
