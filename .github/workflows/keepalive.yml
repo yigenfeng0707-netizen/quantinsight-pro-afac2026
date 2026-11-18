@@ -32,21 +32,26 @@ jobs:
             | jq -r '.data.status // empty')
           echo "Studio status: $status"
 
-          if [ "$status" = "Running" ]; then
-            code=$(curl -s -o /dev/null -w "%{http_code}" \
-              -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
-              "https://${MS_OWNER}-${MS_REPO}.ms.show/")
-            echo "Health probe -> HTTP $code"
-            if [ "$code" != "200" ]; then
-              echo "Instance unhealthy, triggering redeploy..."
+          # 状态机：Running → 健康探测；Building/Deploying 等过渡态 → 不干预（避免打断构建）；
+          # 其余（Failed/Stopped/空）→ 自愈 redeploy
+          case "$status" in
+            Running)
+              code=$(curl -s -o /dev/null -w "%{http_code}" \
+                -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+                "https://${MS_OWNER}-${MS_REPO}.ms.show/")
+              echo "Health probe -> HTTP $code"
+              if [ "$code" != "200" ]; then
+                echo "Instance unhealthy, triggering redeploy..."
+                curl -s -X POST "https://modelscope.cn/openapi/v1/studios/$MS_OWNER/$MS_REPO/deploy" \
+                  -H "Authorization: Bearer $MS_TOKEN" -A "Mozilla/5.0"
+              fi ;;
+            Building|Deploying|Pending|Starting|Stopping)
+              echo "Studio in transit ($status), skip keepalive probe." ;;
+            *)
+              echo "Not running (status=$status), self-healing via deploy..."
               curl -s -X POST "https://modelscope.cn/openapi/v1/studios/$MS_OWNER/$MS_REPO/deploy" \
-                -H "Authorization: Bearer $MS_TOKEN" -A "Mozilla/5.0"
-            fi
-          else
-            echo "Not running (status=$status), self-healing via deploy..."
-            curl -s -X POST "https://modelscope.cn/openapi/v1/studios/$MS_OWNER/$MS_REPO/deploy" \
-              -H "Authorization: Bearer $MS_TOKEN" -A "Mozilla/5.0"
-          fi
+                -H "Authorization: Bearer $MS_TOKEN" -A "Mozilla/5.0" ;;
+          esac
 
       - name: Cleanup old keepalive runs
         env:
