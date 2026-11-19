@@ -23,5 +23,6 @@ EXPOSE 7860
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
     CMD curl -sf http://localhost:7860/ || exit 1
 
-# 启动：后台引导财报入库（幂等，失败不影响应用），前台 streamlit
-CMD ["sh", "-c", "mkdir -p logs && (python scripts/build_financials.py --skip-if-rows 150 --sleep 0.5 > logs/fin_bootstrap.log 2>&1 &) ; exec streamlit run app.py --server.port=7860 --server.address=0.0.0.0 --server.headless=true"]
+# 启动：财报引导已改为 Dockerfile 构建期不做、运行期由 streamlit 首屏按需触发
+# （回滚到最简 CMD：sh -c 后台子 shell 在部分平台构建器上会导致失败）
+CMD ["streamlit", "run", "app.py", "--server.port=7860", "--server.address=0.0.0.0", "--server.headless=true"]

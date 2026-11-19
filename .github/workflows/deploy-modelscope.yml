@@ -70,6 +70,9 @@ jobs:
             --exclude='*.pyc' \
             --exclude='_test_*.mjs' \
             --exclude='_bt.mjs' \
+            --exclude='.streamlit/secrets.toml' \
+            --exclude='*.db-shm' \
+            --exclude='*.db-wal' \
             streamlit_app/ studio/
           # 部署配置（Dockerfile / ms_deploy.json）
           cp deploy/modelscope/* studio/
