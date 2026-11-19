@@ -2,7 +2,7 @@
 # 每 30 分钟由计划任务 QIHealthCheck 调用一次；连续 N 次失败弹窗告警。
 # 手动跑一次：powershell -NoProfile -ExecutionPolicy Bypass -File scripts\healthcheck_qi.ps1
 param(
-    [string]$Url = "http://121.196.102.54/_stcore/health",
+    [string]$Url = "https://gsym236998-quantinsight-pro.ms.show/_stcore/health",
     [int]$FailThreshold = 3,
     [int]$TimeoutSec = 15,
     [int]$PopupSeconds = 30
@@ -55,7 +55,7 @@ if ($ok) {
         $lastAlert = ""
         if (Test-Path $AlertMark) { $lastAlert = ((Get-Content $AlertMark -Raw) -as [string]).Trim() }
         if ($lastAlert -ne $today) {
-            $msg = "QuantInsight Demo 连续 $fails 次健康检查失败`n`n$Url`n$detail`n`n处理（见《部署速查》）：`n1) Workbench 登录服务器`n2) taskkill /F /IM python.exe`n3) schtasks /run /tn QuantInsight"
+            $msg = "QuantInsight Demo 连续 $fails 次健康检查失败`n`n$Url`n$detail`n`n处理（见《部署速查》）：`n1) 等待 keepalive 自愈（每 5 分钟探测，Building 状态不干预）`n2) 或登录 modelscope.cn 创空间控制台查看构建状态`n3) 持续失败 → GitHub afac2026 仓库手动触发 deploy-modelscope workflow"
             try {
                 (New-Object -ComObject WScript.Shell).Popup($msg, $PopupSeconds, "QuantInsight 告警", 48) | Out-Null
             } catch { }
