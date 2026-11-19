@@ -76,6 +76,20 @@ jobs:
           # 财报引导脚本（容器启动后台拉取 financials）
           mkdir -p studio/scripts
           cp scripts/build_financials.py studio/scripts/
+          # LLM 凭据：从 GitHub Secret 现场生成，绝不进仓库/镜像历史
+          # （LongCat 为 2026-11 实测唯一可用通道；其余 provider 额度尽均不可用）
+          if [ -n "${{ secrets.LONGCAT_API_KEY }}" ]; then
+            mkdir -p studio/.streamlit
+            cat > studio/.streamlit/secrets.toml <<TOML
+[llm]
+LONGCAT_API_KEY = "${{ secrets.LONGCAT_API_KEY }}"
+LONGCAT_MODEL = "LongCat-2.5"
+LONGCAT_BASE_URL = "https://api.longcat.chat/openai/v1/chat/completions"
+TOML
+            echo "secrets.toml generated from GitHub Secret (not committed)"
+          else
+            echo "::warning::LONGCAT_API_KEY secret 未配置，AI 问答将为 Mock 模式"
+          fi
           echo "--- payload ---"
           du -sh studio/
 

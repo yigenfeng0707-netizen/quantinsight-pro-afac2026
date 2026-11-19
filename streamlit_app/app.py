@@ -582,6 +582,12 @@ def get_llm_config():
                      'https://api.stepfun.com/v1/chat/completions'):
         return config
 
+    # 3.5 LongCat (BACKUP 2.5 - 美团 LongCat-2.5, 2026-11 实测唯一可用通道)
+    #     base_url 必须带 /openai/v1（非标准 /v1）；reasoning model，content 可能为空
+    if _try_provider('longcat', 'LONGCAT', 'LongCat-2.5',
+                     'https://api.longcat.chat/openai/v1/chat/completions'):
+        return config
+
     # 4. DeepSeek (BACKUP 3)
     if _try_provider('deepseek', 'DEEPSEEK', 'deepseek-chat',
                      'https://api.deepseek.com/chat/completions'):
