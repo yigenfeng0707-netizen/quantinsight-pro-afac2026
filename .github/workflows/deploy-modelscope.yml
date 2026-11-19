@@ -76,17 +76,19 @@ jobs:
           # 财报引导脚本（容器启动后台拉取 financials）
           mkdir -p studio/scripts
           cp scripts/build_financials.py studio/scripts/
-          # LLM 凭据：从 GitHub Secret 现场生成，绝不进仓库/镜像历史
-          # （LongCat 为 2026-11 实测唯一可用通道；其余 provider 额度尽均不可用）
+          # LLM 凭据：从 GitHub Secret 现场生成
+          # 权衡说明：魔搭创空间靠 git push 构建，key 必须在 payload 内才能生效；
+          # 魔搭仓库公开 → key 可见。已与项目负责人确认接受该风险（LongCat 免费额度，可随时轮换）。
+          mkdir -p studio/.streamlit
+          # 确保不被继承的 .gitignore 规则排除（streamlit_app/.gitignore 可能含 secrets.toml）
+          rm -f studio/.streamlit/.gitignore studio/.streamlit/secrets.toml.gitignore 2>/dev/null || true
           if [ -n "${{ secrets.LONGCAT_API_KEY }}" ]; then
-            mkdir -p studio/.streamlit
-            cat > studio/.streamlit/secrets.toml <<TOML
-[llm]
-LONGCAT_API_KEY = "${{ secrets.LONGCAT_API_KEY }}"
-LONGCAT_MODEL = "LongCat-2.5"
-LONGCAT_BASE_URL = "https://api.longcat.chat/openai/v1/chat/completions"
-TOML
-            echo "secrets.toml generated from GitHub Secret (not committed)"
+            printf '[llm]\nLONGCAT_API_KEY = "%s"\nLONGCAT_MODEL = "LongCat-2.5"\nLONGCAT_BASE_URL = "https://api.longcat.chat/openai/v1/chat/completions"\n' \
+              "${{ secrets.LONGCAT_API_KEY }}" > studio/.streamlit/secrets.toml
+            echo "secrets.toml 字节数: $(wc -c < studio/.streamlit/secrets.toml)"
+            grep -q '^LONGCAT_API_KEY = ".\{20,\}"' studio/.streamlit/secrets.toml \
+              && echo "secrets.toml OK (LONGCAT_API_KEY 已注入)" \
+              || { echo "::error::secrets.toml 生成异常"; exit 1; }
           else
             echo "::warning::LONGCAT_API_KEY secret 未配置，AI 问答将为 Mock 模式"
           fi
