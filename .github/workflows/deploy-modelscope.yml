@@ -86,7 +86,8 @@ jobs:
           # 确保不被继承的 .gitignore 规则排除（streamlit_app/.gitignore 可能含 secrets.toml）
           rm -f studio/.streamlit/.gitignore studio/.streamlit/secrets.toml.gitignore 2>/dev/null || true
           if [ -n "${{ secrets.LONGCAT_API_KEY }}" ]; then
-            printf '[llm]\nLONGCAT_API_KEY = "%s"\nLONGCAT_MODEL = "LongCat-2.5"\nLONGCAT_BASE_URL = "https://api.longcat.chat/openai/v1/chat/completions"\n' \
+            # Streamlit secrets 是扁平结构（st.secrets["KEY"]），不能放 [llm] section 下
+            printf 'LONGCAT_API_KEY = "%s"\nLONGCAT_MODEL = "LongCat-2.5"\nLONGCAT_BASE_URL = "https://api.longcat.chat/openai/v1/chat/completions"\n' \
               "${{ secrets.LONGCAT_API_KEY }}" > studio/.streamlit/secrets.toml
             echo "secrets.toml 字节数: $(wc -c < studio/.streamlit/secrets.toml)"
             grep -q '^LONGCAT_API_KEY = ".\{20,\}"' studio/.streamlit/secrets.toml \
