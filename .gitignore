@@ -34,6 +34,7 @@ $RECYCLE.BIN/
 *.log
 _test_*.py
 _test_*.ps1
+_test_*.mjs
 _test_sensenova*.py
 _streamlit_test*.log
 _gen_*.py
@@ -227,3 +228,9 @@ _healthcheck/
 check_trial_usage.mjs
 _quality/
 logs_fin_bootstrap.log
+
+# 运行时模型注册产物（ml 包 walk-forward 生成，不入 payload）
+streamlit_app/models/
+
+# 演示视频帧与渲染脚本（本地素材）
+visualization/
