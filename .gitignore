@@ -225,3 +225,5 @@ _healthcheck/
 
 # 线上后台查询脚本（含 admin 密码，仅本地）
 check_trial_usage.mjs
+_quality/
+logs_fin_bootstrap.log

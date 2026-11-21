@@ -34,6 +34,32 @@ except ImportError:
     _qi_db = None
     HAS_SQLITE_DB = False
 
+# ============== 财报后台引导（仅容器：QI_FIN_BOOTSTRAP=1） ==============
+# app.py 每次 rerun 都会重新执行到这里，用 session_state 保证每会话只起一个线程。
+# 线程跑 scripts/build_financials.py（幂等 --skip-if-rows），失败静默——绝不影响主服务。
+import os as _os
+import sys as _sys
+import threading as _threading
+if (_os.environ.get("QI_FIN_BOOTSTRAP") == "1" and HAS_SQLITE_DB
+        and 'fin_bootstrap_started' not in st.session_state):
+    st.session_state.fin_bootstrap_started = True
+
+    def _fin_bootstrap():
+        try:
+            import subprocess as _sp
+            _root = _os.path.dirname(_os.path.abspath(__file__))
+            _sp.run(
+                [_sys.executable, _os.path.join(_root, "scripts", "build_financials.py"),
+                 "--skip-if-rows", "150", "--sleep", "0.5"],
+                cwd=_root,
+                stdout=open(_os.path.join(_root, "logs_fin_bootstrap.log"), "w"),
+                stderr=_sp.STDOUT, timeout=900)
+        except Exception:
+            pass  # 引导失败不影响应用；财务接地自动退化为空
+
+    _threading.Thread(target=_fin_bootstrap, daemon=True,
+                      name="fin-bootstrap").start()
+
 
 # ============== akshare 安全调用封装 ==============
 # ECS 服务器上东方财富接口可能封禁服务器 IP, 统一封装重试 + 降级逻辑

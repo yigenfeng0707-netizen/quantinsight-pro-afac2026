@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir -r requirements.txt \
 # 应用代码 + 数据库（qi_data.db 已随仓库携带）
 COPY . .
 
+# 财报引导开关：app 启动线程检测到该 ENV 时后台拉取 financials（幂等，失败静默）
+ENV QI_FIN_BOOTSTRAP=1
+
 EXPOSE 7860
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \

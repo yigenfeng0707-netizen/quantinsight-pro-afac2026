@@ -48,8 +48,8 @@ def render_semantic_browser() -> None:
         _fallback()
         return
 
-    tab_metric, tab_factor, tab_entity, tab_graph = st.tabs(
-        ["📐 指标字典", "🧮 因子目录", "🔎 实体查询", "🕸 本体图谱"]
+    tab_metric, tab_factor, tab_entity, tab_graph, tab_gov = st.tabs(
+        ["📐 指标字典", "🧮 因子目录", "🔎 实体查询", "🕸 本体图谱", "🗂 数据治理"]
     )
 
     # ---------------- Tab 1: 指标字典 ----------------
@@ -163,6 +163,110 @@ def render_semantic_browser() -> None:
         st.subheader("本体邻接图")
         st.caption("以实体为中心的一跳关系网络（类别-实例-绑定）。")
         _render_entity_graph(sg, linker)
+
+    # ---------------- Tab 5: 数据治理 ----------------
+    with tab_gov:
+        _render_governance_tab()
+
+
+def _render_governance_tab() -> None:
+    """数据治理：表新鲜度 SLA / 质量门禁留痕 / 指标血缘。失败降级不崩页。"""
+    st.subheader("数据治理")
+    st.caption("新鲜度 SLA · 质量门禁留痕 · 指标血缘（metric → 表 → 源接口 → 口径）。")
+
+    try:
+        from features.sqlite_data_layer import QIDataDB
+        import json as _json
+        db = QIDataDB()
+    except Exception as e:
+        st.warning(f"数据层不可用：{e}")
+        return
+
+    # 1) 表新鲜度（SLA 分钟）
+    st.markdown("**表新鲜度**（SLA：数值表 1440 分钟 / 快照 90 分钟 / 财报 30 天）")
+    sla = {"stock_spot": 90, "stock_history": 1440, "northbound_flow": 1440,
+           "sector_flow": 1440, "fund_flow": 1440, "macro_indices": 1440,
+           "market_breadth": 1440, "margin_trading": 1440, "stock_profile": 43200,
+           "financials": 43200}
+    rows = []
+    try:
+        import datetime as _dt
+        conn = db._get_conn()
+        metas = conn.execute(
+            "SELECT table_name, last_updated, row_count FROM data_meta").fetchall()
+        fin = conn.execute(
+            "SELECT COUNT(*), MAX(updated_at) FROM financials").fetchone()
+        metas.append(("financials", fin[1], fin[0]))
+        for t, last, n in metas:
+            try:
+                age = (_dt.datetime.now() - _dt.datetime.fromisoformat(str(last))
+                       ).total_seconds() / 60
+            except (ValueError, TypeError):
+                age = None
+            s = sla.get(t, 1440)
+            rows.append({
+                "表": t, "行数": n or 0,
+                "最近更新": str(last) if last else "—",
+                "SLA(分)": s,
+                "状态": "—" if age is None else ("🟢" if age <= s else
+                                                 ("🟡" if age <= s * 3 else "🔴")),
+                "年龄(分)": round(age, 1) if age is not None else None,
+            })
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    except Exception as e:
+        st.caption(f"新鲜度读取失败：{e}")
+
+    # 2) 质量门禁留痕
+    st.markdown("**质量门禁留痕**（production_check / data_quality 每次运行写一条）")
+    try:
+        qdf = db.get_quality_log(10)
+        if qdf is not None:
+            qdf["概要"] = qdf["details_json"].apply(
+                lambda s: _json.loads(s).get("checks", "") if s else "")
+            qdf["概要"] = qdf["概要"].apply(
+                lambda s: "、".join(s[:6]) if isinstance(s, list) else str(s)[:80])
+            st.dataframe(qdf[["ts", "overall", "概要"]],
+                         use_container_width=True, hide_index=True)
+        else:
+            st.caption("尚无留痕——跑 `python scripts/data_quality.py` 生成。")
+    except Exception as e:
+        st.caption(f"quality_log 读取失败：{e}")
+
+    st.caption("命令：`python scripts/production_check.py`（六道门禁）· "
+               "`python scripts/data_quality.py`（质量报告）")
+
+    # 3) 指标血缘（本体驱动，直接 SPARQL 查含 bindingApi）
+    st.markdown("**指标血缘**（来自 semantic/metrics.ttl：绑定表 → 字段 → 源接口 → 口径）")
+    try:
+        from rdflib.namespace import RDF as _RDF
+        q = '''
+        SELECT ?m ?name ?tbl ?col ?api ?cal WHERE {
+            ?m a qi:Metric ; qi:name ?name .
+            ?m qi:bindingTable ?tbl .
+            OPTIONAL { ?m qi:bindingColumn ?col }
+            OPTIONAL { ?m qi:bindingApi ?api }
+            OPTIONAL { ?m qi:caliber ?cal }
+        } ORDER BY ?tbl ?name'''
+        lineage = []
+        from rdflib import Namespace as _NS
+        _QI = _NS("http://quantinsight.pro/ontology/")
+        for row in sg.g.query(q, initNs={"qi": _QI}):
+            m_uri, name, tbl, col, api, cal = row
+            lineage.append({
+                "指标": str(name),
+                "绑定表": str(tbl),
+                "字段": str(col) if col else "",
+                "源接口": str(api) if api else "",
+                "口径": (str(cal) if cal else "")[:60],
+            })
+        if lineage:
+            st.dataframe(pd.DataFrame(lineage), use_container_width=True,
+                         hide_index=True,
+                         column_config={"口径": st.column_config.TextColumn(width="large")})
+        else:
+            st.caption("无绑定型指标。")
+    except Exception as e:
+        st.caption(f"血缘读取失败：{e}")
 
 
 def _render_entity_graph(sg, linker) -> None:

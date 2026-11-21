@@ -36,14 +36,20 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 _ECS_DATA_DIR = Path("/opt/quantinsight/data")
-_LOCAL_DATA_DIR = Path("./data")
+# 本地路径候选：模块相对优先（防 cwd 漂移拿到空库），cwd 相对兜底（兼容旧部署布局）
+_LOCAL_DATA_DIR_CANDIDATES = [
+    Path(__file__).resolve().parent.parent / "data",   # streamlit_app/data
+    Path("./data"),
+]
 
 def _resolve_db_path() -> Path:
     """根据运行环境决定数据库路径"""
     if _ECS_DATA_DIR.parent.exists():
         db_dir = _ECS_DATA_DIR
     else:
-        db_dir = _LOCAL_DATA_DIR
+        db_dir = next((d for d in _LOCAL_DATA_DIR_CANDIDATES
+                       if (d / "qi_data.db").exists()),
+                      _LOCAL_DATA_DIR_CANDIDATES[0])
     db_dir.mkdir(parents=True, exist_ok=True)
     return db_dir / "qi_data.db"
 
@@ -177,6 +183,14 @@ CREATE TABLE IF NOT EXISTS financials (
     PRIMARY KEY (code, period, metric_key)
 );
 CREATE INDEX IF NOT EXISTS idx_financials_code ON financials(code);
+
+-- 数据质量门禁留痕（production_check / data_quality 每次跑写一条）
+CREATE TABLE IF NOT EXISTS quality_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          TEXT NOT NULL,
+    overall     TEXT NOT NULL,          -- PASS / WARN / FAIL
+    details_json TEXT
+);
 
 -- 数据元信息
 CREATE TABLE IF NOT EXISTS data_meta (
@@ -905,6 +919,41 @@ class QIDataDB:
     # ==================================================================
     # 财务指标（语义层 financials 绑定表）
     # ==================================================================
+
+    # ==================================================================
+    # 数据质量门禁留痕（quality_log）
+    # ==================================================================
+
+    def log_quality(self, overall: str, details: dict):
+        """写一条质量门禁结果（production_check / data_quality 调用）"""
+        now = self._now_iso()
+        conn = self._get_conn()
+        try:
+            conn.execute(
+                """INSERT INTO quality_log (ts, overall, details_json)
+                   VALUES (?, ?, ?)""",
+                (now, overall, json.dumps(details, ensure_ascii=False)),
+            )
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error("log_quality 失败: %s", e)
+
+    def get_quality_log(self, limit: int = 10) -> Optional[pd.DataFrame]:
+        """读取最近 N 条质量门禁结果（治理页展示用）"""
+        conn = self._get_conn()
+        try:
+            df = pd.read_sql(
+                "SELECT ts, overall, details_json FROM quality_log "
+                "ORDER BY id DESC LIMIT ?",
+                conn, params=(limit,),
+            )
+        except Exception as e:
+            logger.warning("读取 quality_log 失败: %s", e)
+            return None
+        if df.empty:
+            return None
+        return df
 
     def upsert_financials(self, rows: list[dict]):
         """批量写入财务指标行（主键冲突即覆盖）
