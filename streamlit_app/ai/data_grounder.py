@@ -492,11 +492,13 @@ class DataGrounder:
         return out
 
     def _ground_financial_queries(self, question: str) -> list[dict]:
-        """财务指标接地（V4.0 语义层）
+        """财务指标接地（V4.1 语义层，支持年份指定与同比增速）
 
         语义层解析问题中的实体（如"茅台"→600519）与财务指标（如"营业收入"
-        →revenue + 口径），从 financials 表确定性取数，作为可引用证据。
-        无实体或无财务指标命中时返回空——回到原有问答路径。
+        →revenue + 口径），从 financials 表确定性取数：
+          - 值题：问题含年份 → 指定年报期；否则最新年报期
+          - 增速题（"同比"）：取相邻两期年报确定性计算 (cur/prev-1)×100
+        命中作为可引用证据（source: sqlite:financials）。
         """
         if self.qi_db is None:
             return []
@@ -511,32 +513,68 @@ class DataGrounder:
         if not entities or not metrics:
             return []
 
+        import re as _re
+        want_growth = bool(_re.search(r"同比|增速|增长率", question))
+        year_m = _re.search(r"(20\d{2})", question)
+        want_period = f"{year_m.group(1)}-12-31" if year_m else None
+
         col_map = {m.binding_column: m for m in metrics}
         out = []
         for ent in entities:
-            df = self.qi_db.get_financials(ent.code, list(col_map))
-            if df is None or df.empty:
-                continue
-            # 每个指标只取最新报告期（get_financials 已按 period 倒序）
-            seen_keys = set()
-            for _, row in df.iterrows():
-                m = col_map.get(row["metric_key"])
-                if m is None or row["metric_key"] in seen_keys:
+            for metric_key in col_map:
+                df = self.qi_db.get_financials(ent.code, [metric_key], limit=8)
+                if df is None or df.empty:
                     continue
-                seen_keys.add(row["metric_key"])
-                try:
-                    value = float(row["value"])
-                except (TypeError, ValueError):
-                    continue
+                annual = df[df["period"].str.endswith("-12-31")]
+                if annual.empty:
+                    annual = df
+                rows = annual.sort_values("period", ascending=False)
                 name = ent.name or ent.code
-                out.append({
-                    "answer": f"{value:,.2f}",
-                    "description": (
-                        f"{name} {m.name}（{row['period']} 年报，单位：{row.get('unit', '元')}）"
-                        f"｜口径: {m.caliber}"
-                    ),
-                    "date": row["period"],
-                })
+                m = col_map[metric_key]
+
+                if want_growth:
+                    if len(rows) < 2:
+                        continue
+                    cur = rows.iloc[0]
+                    prev = rows.iloc[1]
+                    try:
+                        v1, v0 = float(cur["value"]), float(prev["value"])
+                    except (TypeError, ValueError):
+                        continue
+                    if v0 == 0:
+                        continue
+                    growth = (v1 / v0 - 1) * 100
+                    out.append({
+                        "answer": f"{growth:.2f}",
+                        "description": (
+                            f"{name} {m.name}同比增速（{cur['period']} 年报 vs "
+                            f"{prev['period']} 年报，{v1:,.0f} vs {v0:,.0f} {cur.get('unit', '元')}）"
+                            f"｜口径: {m.caliber}"
+                        ),
+                        "date": cur["period"],
+                    })
+                else:
+                    row = None
+                    if want_period:
+                        hit = rows[rows["period"] == want_period]
+                        row = hit.iloc[0] if not hit.empty else None
+                        if row is None:
+                            # 指定年报缺失时如实降级为最新期（描述里注明）
+                            row = rows.iloc[0]
+                    else:
+                        row = rows.iloc[0]
+                    try:
+                        value = float(row["value"])
+                    except (TypeError, ValueError):
+                        continue
+                    out.append({
+                        "answer": f"{value:,.2f}",
+                        "description": (
+                            f"{name} {m.name}（{row['period']} 年报，"
+                            f"单位：{row.get('unit', '元')}）｜口径: {m.caliber}"
+                        ),
+                        "date": row["period"],
+                    })
         return out
 
     def _match_industries(self, question: str) -> list[str]:
