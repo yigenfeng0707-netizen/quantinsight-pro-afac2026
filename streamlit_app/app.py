@@ -1800,6 +1800,36 @@ elif page == '🤖 AI 投研问答':
         llm_config = get_llm_config()
         use_real_llm = llm_config['api_key'] is not None
 
+        # ============== 语义对齐前置条（试用反馈 2026-11-21："回复要先把语义对齐"）==============
+        # 回答前先展示实体链接/指标解析/口径——语义层从后台能力变为用户可见的对齐确认环节
+        try:
+            from semantic.layer import get_linker, get_parser
+            _ents = get_linker().link(question)
+            _mets = get_parser().parse(question)
+            if _ents or _mets:
+                _chunks = []
+                for _e in _ents[:3]:
+                    _chunks.append(f"**实体**：{_e.name or '（未具名）'}"
+                                   f"（{_e.kind}{('·' + _e.code) if _e.code else ''}）")
+                for _m in _mets[:3]:
+                    _chunks.append(f"**指标**：{_m.name}"
+                                   f"（{_m.unit or '—'}，绑定 {_m.binding_table or '计算型'}）")
+                _cal = next((m.caliber for m in _mets if m.caliber), None)
+                _cal_line = ''
+                if _cal:
+                    _cal_line = f'<br><small style="color:#8A92B0;">口径：{_cal[:90]}</small>'
+                st.markdown(
+                    '<div style="background:rgba(0,212,255,0.08);border-left:3px solid #00D4FF;'
+                    'padding:10px 14px;border-radius:6px;margin:6px 0;">'
+                    '<small style="color:#00D4FF;">🎯 语义对齐</small><br>'
+                    + ' ｜ '.join(_chunks)
+                    + _cal_line
+                    + '</div>', unsafe_allow_html=True)
+            else:
+                st.caption('🔎 语义对齐：未识别到可接地实体/指标——回答将基于检索与通用知识。')
+        except Exception as _align_err:
+            logger.debug(f"语义对齐条渲染失败（不影响回答）: {_align_err}")
+
         # 尝试使用 MainAgent (多智能体协作)
         use_multi_agent = use_real_llm and st.checkbox('🧠 启用 Multi-Agent 协作模式', value=True, key='use_ma')
 
