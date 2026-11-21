@@ -234,3 +234,6 @@ streamlit_app/models/
 
 # 演示视频帧与渲染脚本（本地素材）
 visualization/
+
+# Remotion 视频渲染工程（620M，视频已成片入 delivery/submission，工程本地保留）
+demo-video-remotion/
