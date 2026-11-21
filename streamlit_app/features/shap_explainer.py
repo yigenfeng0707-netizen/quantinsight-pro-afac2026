@@ -20,6 +20,9 @@ QuantInsight Pro - SHAP 可解释性分析模块
 """
 import os
 import io
+import logging
+
+logger = logging.getLogger(__name__)
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -101,15 +104,28 @@ FACTOR_DEFINITIONS = [
 
 # ============== 2. 数据加载 ==============
 
-@st.cache_data(ttl=3600, show_spinner="加载akshare因子数据...")
+@st.cache_data(ttl=3600, show_spinner="加载因子数据...")
 def load_factor_data(n_stocks: int = 200, lookback_days: int = 750) -> pd.DataFrame:
-    """从akshare拉取多因子数据（带降级方案）
+    """因子数据加载：本地库真实数据优先 → akshare → 合成（三级降级）
 
-    真实数据源失败时使用模拟数据（带真实统计特征）保证演示可用。
+    生产闭环（ml/features.py）：qi_data.db 真实行情 + financials 披露对齐，
+    与注册模型同源同口径。降级路径保留，保证演示可用。
     """
+    # 1) 本地库真实数据（ml 管线，与训练同源）
+    try:
+        from ml.features import LABEL_COL, build_feature_matrix
+        from features.sqlite_data_layer import QIDataDB
+        df = build_feature_matrix(QIDataDB())
+        if df is not None and len(df) > 100:
+            df = df.rename(columns={LABEL_COL: "target_20d"})
+            df["data_source"] = "local_db_real"
+            return df
+    except Exception as e:
+        logger.warning("ml 真实特征构建失败，降级 akshare: %s", e)
+
+    # 2) akshare 真实数据
     try:
         import akshare as ak
-        # 尝试真实数据
         df = _fetch_real_factor_data(ak, n_stocks, lookback_days)
         if df is not None and len(df) > 100:
             df['data_source'] = 'akshare_real'
@@ -117,7 +133,7 @@ def load_factor_data(n_stocks: int = 200, lookback_days: int = 750) -> pd.DataFr
     except Exception as e:
         st.info(f"💡 真实数据源暂不可用，使用高质量模拟数据演示（{e}）")
 
-    # 降级到模拟数据
+    # 3) 降级到模拟数据
     df = _generate_synthetic_factor_data(n_stocks, lookback_days)
     df['data_source'] = 'synthetic'
     return df
@@ -256,7 +272,32 @@ def _generate_synthetic_factor_data(n_stocks: int, lookback_days: int) -> pd.Dat
 
 @st.cache_resource(show_spinner="训练XGBoost多因子模型...")
 def train_xgboost_model(df: pd.DataFrame) -> Tuple[object, pd.DataFrame, List[str]]:
-    """训练XGBoost回归模型，返回 (model, metrics_df, feature_names)"""
+    """优先加载注册模型（ml/registry），无注册或特征不齐时现场训练。返回 (model, metrics_df, feature_names)"""
+    # 1) 注册模型（生产闭环：walk-forward 训练 → registry → 推理）
+    try:
+        from ml.registry import load_latest
+        reg = load_latest()
+        if reg is not None:
+            model, meta = reg
+            feats = meta["features"]
+            if all(c in df.columns for c in feats):
+                mean_ic = meta.get("mean_ic")
+                fold_ics = meta.get("fold_ics", [])
+                ic_text = "; ".join(f"f{f['fold']}={f['ic']}" for f in fold_ics)
+                metrics_df = pd.DataFrame({
+                    "metric": ["来源", "walk-forward IC（逐折）", "样本窗口", "特征来源"],
+                    "value": [
+                        f"注册模型 {meta['model_id']}",
+                        f"overall={meta.get('overall_ic')}（{ic_text}）",
+                        f"{meta['window']['min_date']}~{meta['window']['max_date']}（{meta['window']['rows']} 行）",
+                        "本地库真实行情 + 财报披露对齐 + 少数因子中位数填充（见模型 metadata）",
+                    ],
+                })
+                logger.info("SHAP 使用注册模型 %s (IC=%s)", meta["model_id"], mean_ic)
+                return model, metrics_df, feats
+    except Exception as e:
+        logger.warning("注册模型加载失败，降级现场训练: %s", e)
+
     try:
         import xgboost as xgb
     except ImportError:
@@ -578,6 +619,39 @@ def render_shap_dashboard(auto_run: bool = False):
         model, metrics_df, feature_cols = train_xgboost_model(df)
         X = df[feature_cols].fillna(0)
         shap_result = compute_shap_values(model, X, feature_cols)
+
+    # 预测落日志（ml 闭环：监控页用 predictions_log 对齐实现收益）
+    try:
+        import numpy as _np
+        _preds = _np.asarray(shap_result['shap_values']).sum(axis=1) \
+            + float(shap_result.get('base_value', 0.0))
+        _code_col = _safe_col(df, 'code', '代码', '股票代码')
+        if _code_col and 'date' in df.columns:
+            _asof = df['date'].max()
+            # 只落最新截面（每股 asof=最后交易日），防日志表膨胀
+            _mask = (df['date'] == _asof).values
+            _df_last = df[_mask]
+            _preds_last = _preds[_mask]
+            try:
+                from ml.registry import MODELS_DIR
+                import json as _json
+                _reg = MODELS_DIR / "registry.json"
+                _mid = ""
+                if _reg.exists():
+                    _entries = _json.loads(_reg.read_text(encoding="utf-8"))
+                    _mid = _entries[-1]["model_id"] if _entries else ""
+                _rows = [(str(r[_code_col]), str(_asof), float(p))
+                         for r, p in zip(_df_last.to_dict('records'), _preds_last)
+                         if r.get(_code_col)]
+                if _mid and _rows:
+                    from features.sqlite_data_layer import QIDataDB
+                    QIDataDB().log_predictions(_mid, _rows)
+                    logger.info("predictions_log 落 %d 行 (%s @ %s)",
+                                len(_rows), _mid, _asof)
+            except Exception as _e:
+                logger.warning("预测日志落库失败（不影响展示）: %s", _e)
+    except Exception:
+        pass
 
     if shap_result is None:
         st.error("❌ SHAP计算失败，请检查模型和数据")

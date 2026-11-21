@@ -57,6 +57,11 @@ qi:DataSource a owl:Class ;
     rdfs:label "数据源" ;
     rdfs:comment "行情/财务数据的来源（本地库或外部接口）。" .
 
+qi:MLModel a owl:Class ;
+    rdfs:subClassOf qi:FinancialConcept ;
+    rdfs:label "机器学习模型" ;
+    rdfs:comment "注册在案的训练模型（walk-forward IC、特征血缘随 metadata 可溯）。" .
+
 qi:ReportPeriod a owl:Class ;
     rdfs:subClassOf qi:FinancialConcept ;
     rdfs:label "报告期" ;
@@ -101,6 +106,11 @@ qi:measuredBy a owl:ObjectProperty ;
 qi:sourcedFrom a owl:ObjectProperty ;
     rdfs:label "数据来源于" ;
     rdfs:comment "domain 无限制：任何实体都可挂接数据源。" .
+
+qi:usedInModel a owl:ObjectProperty ;
+    rdfs:domain qi:Factor ; rdfs:range qi:MLModel ;
+    rdfs:label "被模型使用" ;
+    rdfs:comment "因子进入哪个注册模型（模型-因子血缘，由 ml.train 注册时写入）。" .
 
 qi:reportedIn a owl:ObjectProperty ;
     rdfs:domain qi:Metric ; rdfs:range qi:ReportPeriod ;

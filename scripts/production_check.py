@@ -189,6 +189,8 @@ G5_ASKS = [
     ("SHAP 大类存在", 'ASK { qi:cat_shap a qi:FactorCategory }'),
     ("本地库数据源", 'ASK { qi:src_local_sqlite a qi:DataSource }'),
     ("区间涨跌幅对应 T2/T5", 'ASK { qi:m_interval_return qi:evalType "T2,T5" }'),
+    ("注册模型为本体实例", 'ASK { ?m a qi:MLModel }'),
+    ("因子-模型血缘存在", 'ASK { ?f qi:usedInModel ?m }'),
 ]
 
 def g5_ontology(g: Gate) -> None:
@@ -222,7 +224,7 @@ def g6_registry(g: Gate) -> None:
         entries = json.loads(reg.read_text(encoding="utf-8"))
         latest = entries[-1] if isinstance(entries, list) else None
         mdir = APP / "models" / latest["model_id"]
-        ok = (mdir / "model.json").exists() and (mdir / "metadata.json").exists()
+        ok = (mdir / "model.pkl").exists() and (mdir / "metadata.json").exists()
         ic = latest.get("mean_ic")
         if not ok:
             g.finish("FAIL", f"最新模型 {latest.get('model_id')} 工件缺失", t0)

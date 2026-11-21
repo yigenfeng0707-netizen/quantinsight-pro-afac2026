@@ -1,0 +1,41 @@
+@prefix qi: <http://quantinsight.pro/ontology/> .
+
+qi:shap_Current_Ratio qi:usedInModel qi:mlm_xgb-20261121-1539 .
+
+qi:shap_Debt_Ratio qi:usedInModel qi:mlm_xgb-20261121-1539 .
+
+qi:shap_Float_Cap qi:usedInModel qi:mlm_xgb-20261121-1539 .
+
+qi:shap_Gross_Margin qi:usedInModel qi:mlm_xgb-20261121-1539 .
+
+qi:shap_MACD_Signal qi:usedInModel qi:mlm_xgb-20261121-1539 .
+
+qi:shap_Momentum_20D qi:usedInModel qi:mlm_xgb-20261121-1539 .
+
+qi:shap_Momentum_60D qi:usedInModel qi:mlm_xgb-20261121-1539 .
+
+qi:shap_NetProfit_Growth qi:usedInModel qi:mlm_xgb-20261121-1539 .
+
+qi:shap_PB qi:usedInModel qi:mlm_xgb-20261121-1539 .
+
+qi:shap_PE_TTM qi:usedInModel qi:mlm_xgb-20261121-1539 .
+
+qi:shap_PS_TTM qi:usedInModel qi:mlm_xgb-20261121-1539 .
+
+qi:shap_ROE qi:usedInModel qi:mlm_xgb-20261121-1539 .
+
+qi:shap_RSI_14 qi:usedInModel qi:mlm_xgb-20261121-1539 .
+
+qi:shap_Revenue_Growth qi:usedInModel qi:mlm_xgb-20261121-1539 .
+
+qi:shap_Turnover_20D qi:usedInModel qi:mlm_xgb-20261121-1539 .
+
+qi:shap_Volatility_20D qi:usedInModel qi:mlm_xgb-20261121-1539 .
+
+qi:shap_Volume_Ratio qi:usedInModel qi:mlm_xgb-20261121-1539 .
+
+qi:mlm_xgb-20261121-1539 a qi:MLModel ;
+    qi:caliber "XGBoost walk-forward；overall IC=-0.1023；窗口 2025-12-05~2026-10-12；特征来源：本地库真实行情 + 财报披露对齐（见 metadata）" ;
+    qi:name "xgb-20261121-1539" ;
+    qi:sourcedFrom qi:src_local_sqlite .
+

@@ -3099,12 +3099,13 @@ elif page == '📡 信号验证中心':
         st.warning('⚠️ 信号验证所需模块未安装，请安装 qlib_integration 和 macro_factor_fusion')
 
     st.markdown('### 🎯 信号验证')
-    st.caption('对卫星/情绪/供应链/资金流信号进行统计验证')
+    st.caption('对卫星/情绪/供应链/资金流/模型预测信号进行统计验证')
 
     col1, col2 = st.columns(2)
     with col1:
         signal_type = st.selectbox('📡 信号类型', [
-            '🛰️ 卫星信号', '💬 情绪信号', '🔗 供应链信号', '💰 资金流信号'
+            '🛰️ 卫星信号', '💬 情绪信号', '🔗 供应链信号', '💰 资金流信号',
+            '🧠 模型信号'
         ], key='sig_verify_type')
         signal_type_map = {
             '🛰️ 卫星信号': 'satellite',
@@ -3119,7 +3120,45 @@ elif page == '📡 信号验证中心':
         run_verify = st.button('🧪 运行验证', type='primary', key='sig_run_verify')
 
     with col2:
-        if run_verify:
+        if signal_type == '🧠 模型信号':
+            # ml 闭环监控：predictions_log vs 实现收益（真实数据，非演示）
+            if run_verify:
+                with st.spinner('正在评估模型预测...'):
+                    mon = None
+                    try:
+                        from ml.monitor import evaluate_predictions
+                        mon = evaluate_predictions(_qi_db)
+                    except Exception as e:
+                        st.error(f'监控计算失败: {type(e).__name__}: {e}')
+                if mon is None:
+                    st.warning('⚠️ predictions_log 样本不足（<50 条）。'
+                               '先到「个股分析 → 🧠 SHAP 解释」页点一次「开始 SHAP 分析」，'
+                               '注册模型的预测会自动落库，之后回本页运行验证。')
+                else:
+                    c1, c2, c3, c4 = st.columns(4)
+                    with c1:
+                        st.metric('IC值', f"{mon['ic']:.4f}",
+                                  delta='有效' if abs(mon['ic']) > 0.03 else '无效')
+                    with c2:
+                        st.metric('命中率', f"{mon['hit_rate']:.1%}",
+                                  delta='优秀' if mon['hit_rate'] > 0.55 else '')
+                    with c3:
+                        st.metric('已实现样本', f"{mon['n_realized']}")
+                    with c4:
+                        st.metric('预测总数', f"{mon['n_predictions']}")
+                    st.caption(f"模型 {mon['model_id']} ｜ 预测日期 "
+                               f"{mon['asof_range'][0]} ~ {mon['asof_range'][1]} ｜ "
+                               "口径：predictions_log 对齐实现 20 日收益，IC=Spearman")
+                    if mon['monthly_ic']:
+                        mdf = pd.DataFrame(mon['monthly_ic'])
+                        fig_m = go.Figure(go.Bar(
+                            x=mdf['month'], y=mdf['ic'],
+                            marker_color=BRAND_CYAN, name='月度 IC'))
+                        fig_m.update_layout(
+                            title='IC 按月（预测方向 vs 实现收益）',
+                            height=320, margin=dict(l=10, r=10, t=40, b=10))
+                        st.plotly_chart(fig_m, use_container_width=True)
+        elif run_verify:
             with st.spinner('正在验证信号...'):
                 try:
                     # 使用SignalVerifier

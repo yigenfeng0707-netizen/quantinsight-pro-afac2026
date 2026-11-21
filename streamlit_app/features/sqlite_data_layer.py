@@ -192,6 +192,17 @@ CREATE TABLE IF NOT EXISTS quality_log (
     details_json TEXT
 );
 
+-- 模型预测日志（ml 闭环：注册模型推理留痕 → 监控页算命中率/IC 衰减）
+CREATE TABLE IF NOT EXISTS predictions_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          TEXT NOT NULL,
+    model_id    TEXT NOT NULL,
+    code        TEXT NOT NULL,
+    asof_date   TEXT NOT NULL,          -- 特征日（该行行情最后日期）
+    pred_20d    REAL
+);
+CREATE INDEX IF NOT EXISTS idx_predlog_model ON predictions_log(model_id, asof_date);
+
 -- 数据元信息
 CREATE TABLE IF NOT EXISTS data_meta (
     table_name  TEXT PRIMARY KEY,
@@ -954,6 +965,51 @@ class QIDataDB:
         if df.empty:
             return None
         return df
+
+    # ==================================================================
+    # 模型预测日志（predictions_log）
+    # ==================================================================
+
+    def log_predictions(self, model_id: str, rows: list[tuple]):
+        """批量落预测（同 model+code+asof 覆盖）。
+
+        Args:
+            model_id: 注册模型 id
+            rows: [(code, asof_date, pred_20d), ...]
+        """
+        if not rows:
+            return
+        now = self._now_iso()
+        conn = self._get_conn()
+        try:
+            conn.executemany(
+                """INSERT INTO predictions_log (ts, model_id, code, asof_date, pred_20d)
+                   VALUES (?, ?, ?, ?, ?)""",
+                [(now, model_id, c, d, p) for c, d, p in rows],
+            )
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            logger.error("log_predictions 失败: %s", e)
+
+    def get_predictions(self, model_id: Optional[str] = None,
+                        limit: int = 50000) -> Optional[pd.DataFrame]:
+        """读取预测日志（监控页对齐实现收益用）"""
+        conn = self._get_conn()
+        try:
+            if model_id:
+                df = pd.read_sql(
+                    "SELECT * FROM predictions_log WHERE model_id = ? "
+                    "ORDER BY id DESC LIMIT ?",
+                    conn, params=(model_id, limit))
+            else:
+                df = pd.read_sql(
+                    "SELECT * FROM predictions_log ORDER BY id DESC LIMIT ?",
+                    conn, params=(limit,))
+        except Exception as e:
+            logger.warning("读取 predictions_log 失败: %s", e)
+            return None
+        return None if df.empty else df
 
     def upsert_financials(self, rows: list[dict]):
         """批量写入财务指标行（主键冲突即覆盖）
