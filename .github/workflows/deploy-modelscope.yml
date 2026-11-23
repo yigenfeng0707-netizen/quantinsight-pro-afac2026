@@ -110,8 +110,18 @@ jobs:
           git init -b master
           git config user.name "github-actions[bot]"
           git config user.email "actions@github.com"
+          # LFS：魔搭容量策略拒收 >10 MiB 的非 LFS 文件（*.db* 在远端 .gitattributes
+          # 里已是 LFS 规则）。先落地本地 .gitattributes 再 add，让 data/*.db 以
+          # 指针形式入库，实体走 LFS 存储，否则 push 会被 pre-receive 拒收。
+          git lfs install || { echo "::error::git-lfs 不可用"; exit 1; }
+          printf '*.db* filter=lfs diff=lfs merge=lfs -text\n*.pkl filter=lfs diff=lfs merge=lfs -text\n' > .gitattributes
           git add -A
+          # 显式重 add 兜底：确保 db/model 文件确实被 lfs filter 转换为指针
+          for f in $(git diff --cached --name-only --diff-filter=A | grep -E '\.(db|pkl)$' || true); do
+            git rm -q --cached "$f"; git add "$f"
+          done
           git commit -m "deploy: ${GITHUB_SHA::7} from quantinsight-pro-afac2026"
+          ROOT_COMMIT=$(git rev-parse HEAD)
           git remote add modelscope "https://oauth2:${MS_GIT_TOKEN}@www.modelscope.cn/studios/${MS_OWNER}/${MS_REPO}.git"
           # 强推前先 fetch+merge 保留远端历史
           git fetch modelscope master || true
@@ -119,6 +129,14 @@ jobs:
             git merge --allow-unrelated-histories -X ours modelscope/master -m "merge remote history" || {
               git checkout --ours . ; git add -A ; git commit -m "merge remote history (ours)"
             }
+            # 同步删除：merge -X ours 会"复活"远端持有但源仓库已删除的文件
+            # （modify/delete 冲突默认偏向有文件的一方）。payload 是唯一真实来源：
+            # 凡是 root commit 里不存在的文件，一律从合并结果中剔除。
+            comm -23 \
+              <(git ls-tree -r --name-only HEAD | sort) \
+              <(git ls-tree -r --name-only "$ROOT_COMMIT" | sort) \
+              | xargs -r git rm -q --cached
+            git commit -q -m "sync deletions from payload source" || echo "no deletions to sync"
           fi
           git push -f modelscope HEAD:master
           echo "Pushed to modelscope master"
