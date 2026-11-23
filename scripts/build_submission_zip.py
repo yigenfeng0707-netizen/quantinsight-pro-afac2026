@@ -14,7 +14,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SUB = ROOT / "submission"
-OUT = SUB / "QuantInsight_Pro_AFAC2026_提交包_20260708_V2.zip"
+# V3：输出文件名带版本号，旧 V2 包保留在.delivery/10_完整提交包/作历史快照
+OUT = SUB / "QuantInsight_Pro_AFAC2026_提交包_20260708_V3.zip"
 MAX_ZIP_BYTES = 50 * 1024 * 1024  # 50 MB
 
 # ---- 目录: 03_正式文档_WORD（含 5 份答辩 Word + 7 张 _assets/PNG）+ POC实验数据 + delivery/ ----
@@ -23,6 +24,11 @@ INCLUDE_DIRS = [
     SUB / "02_Demo交付" / "POC实验数据",
     ROOT / "delivery",  # V2.1: 统一交付目录（手动上传用）
 ]
+# delivery 内的嵌套提交包（含历史 ZIP 自包含）不得二次打进包——否则包滚雪球式膨胀
+EXCLUDE_SUBPATHS_IN_DIRS = {
+    ("delivery", "10_完整提交包"),   # 历史提交包 ZIP
+    ("delivery", "09_代码仓库"),      # 代码仓库副本（与 streamlit_app/ 重复）
+}
 
 # ---- 单文件: V2 新增物料（与 INCLUDE_DIRS 重叠的会经去重跳过） ----
 INCLUDE_FILES = [
@@ -70,6 +76,15 @@ INCLUDE_FILES = [
 STREAMLIT = ROOT / "streamlit_app"
 SKIP_IN_STREAMLIT = {".venv", "__pycache__", ".pytest_cache", "node_modules", ".git"}
 SKIP_SUFFIX = {".pyc", ".log"}
+# 敏感文件禁入提交包：真实 LLM 密钥与用户凭据不得随包分发
+# （V3 修复：V2 包曾误带 secrets.toml 明文密钥与 users.db 密码哈希）
+SKIP_FILES = {
+    ".streamlit/secrets.toml",          # 含真实 API key
+    ".streamlit/secrets.toml.bak*",     # 任何备份密钥
+    "data/users.db",                    # 用户表 + bcrypt 哈希
+    "data/users.db-shm", "data/users.db-wal",
+    "data/qi_data_synthetic_20260708.db.bak",  # 旧备份库
+}
 
 
 def should_skip(path: Path) -> bool:
@@ -78,6 +93,13 @@ def should_skip(path: Path) -> bool:
         return True
     if path.suffix in SKIP_SUFFIX:
         return True
+    # 相对 streamlit_app 的敏感路径
+    try:
+        rel = path.relative_to(STREAMLIT).as_posix()
+        if rel in SKIP_FILES or any(rel.startswith(p.rstrip('*') ) and p.endswith('*') for p in SKIP_FILES if p.endswith('*')):
+            return True
+    except ValueError:
+        pass
     return False
 
 
@@ -113,16 +135,27 @@ def add_dir(zf: zipfile.ZipFile, src: Path, arc_prefix: str, stats: dict, seen: 
         stats["missing"].append(str(src.relative_to(ROOT)))
         return
     for p in src.rglob("*"):
-        if p.is_file() and not should_skip(p):
-            rel = p.relative_to(src)
-            arc = f"{arc_prefix}/{rel.as_posix()}"
-            if arc in seen:
-                stats["dup"] += 1
-                continue
-            seen.add(arc)
-            zf.write(p, arc)
-            stats["count"] += 1
-            stats["bytes"] += p.stat().st_size
+        if not p.is_file() or should_skip(p):
+            continue
+        # 跳过嵌套提交包/代码仓库副本（自包含滚雪球防治）
+        try:
+            rel_root = p.relative_to(ROOT).as_posix().replace('\\', '/')
+        except ValueError:
+            rel_root = p.as_posix()
+        if any(rel_root.startswith('/'.join(pre) + '/') for pre in EXCLUDE_SUBPATHS_IN_DIRS):
+            continue
+        # 跳过任何嵌套 zip（历史提交包快照）
+        if p.suffix == '.zip':
+            continue
+        rel = p.relative_to(src)
+        arc = f"{arc_prefix}/{rel.as_posix()}"
+        if arc in seen:
+            stats["dup"] += 1
+            continue
+        seen.add(arc)
+        zf.write(p, arc)
+        stats["count"] += 1
+        stats["bytes"] += p.stat().st_size
 
 
 def main():

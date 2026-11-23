@@ -45,6 +45,9 @@ METRIC_MAP = {
     "毛利率": "gross_margin",
 }
 
+METRIC_UNIT = {"revenue": "元", "net_profit_parent": "元",
+               "net_profit": "元", "gross_margin": "%"}
+
 PERIOD_RE = re.compile(r"(20\d{2})[-/年]?(\d{1,2})?[-/月]?(\d{1,2})?")
 
 
@@ -69,48 +72,77 @@ def is_annual(period: str) -> bool:
 
 
 def fetch_one(code: str) -> list[dict]:
-    """拉单只标的财报摘要 → financials 行。失败返回 []。"""
+    """拉单只标的财报摘要 → financials 行。失败返回 []。
+
+    兼容两种 akshare 返回形态：
+      宽表（当前版本）：选项 / 指标 / <YYYYMMDD 期间列...> —— 每行一个指标，数值按期间列展开
+      长表（旧版本）：指标 / 报告期 / 数值
+    """
     import akshare as ak
 
     df = ak.stock_financial_abstract(symbol=code)
     if df is None or getattr(df, "empty", True):
         return []
 
-    # 防御性列解析：找 指标 / 报告期 / 数值 三列（中英文均可）
-    cols = {str(c).strip(): c for c in df.columns}
+    cols = [str(c).strip() for c in df.columns]
+
     def find_col(*cands):
         for c in cands:
-            for real, orig in cols.items():
+            for real in cols:
                 if c in real:
-                    return orig
+                    return real
         return None
+
+    # ---- 长表形态 ----
+    if find_col("报告期", "日期") and find_col("数值", "金额"):
+        col_item = find_col("指标")
+        col_period = find_col("报告期", "日期")
+        col_value = find_col("数值", "金额")
+        if col_item is None:
+            return []
+        rows, seen = [], set()
+        for _, r in df.iterrows():
+            metric_key = METRIC_MAP.get(str(r[col_item]).strip())
+            if not metric_key:
+                continue
+            period = normalize_period(r[col_period])
+            if not period:
+                continue
+            try:
+                val = float(r[col_value])
+            except (TypeError, ValueError):
+                continue
+            if (code, period, metric_key) in seen:
+                continue
+            seen.add((code, period, metric_key))
+            rows.append({"code": code, "period": period, "metric_key": metric_key,
+                         "value": val, "unit": METRIC_UNIT[metric_key]})
+        return rows
+
+    # ---- 宽表形态 ----
+    period_cols = [c for c in cols if re.fullmatch(r"20\d{6}", c)]
     col_item = find_col("指标")
-    col_period = find_col("报告期", "日期")
-    col_value = find_col("数值", "金额")
-
-    if col_item is None or col_period is None or col_value is None:
-        log.warning("%s: 财报摘要列结构无法识别 %s", code, list(df.columns))
+    if not period_cols or col_item is None:
+        log.warning("%s: 财报摘要列结构无法识别 %s", code, cols[:8])
         return []
-
-    rows = []
-    seen = set()
+    rows, seen = [], set()
     for _, r in df.iterrows():
         metric_key = METRIC_MAP.get(str(r[col_item]).strip())
         if not metric_key:
             continue
-        period = normalize_period(r[col_period])
-        if not period:
-            continue
-        try:
-            val = float(r[col_value])
-        except (TypeError, ValueError):
-            continue
-        key = (code, period, metric_key)
-        if key in seen:
-            continue
-        seen.add(key)
-        rows.append({"code": code, "period": period,
-                     "metric_key": metric_key, "value": val})
+        for pc in period_cols:
+            period = normalize_period(pc)
+            if not period:
+                continue
+            try:
+                val = float(r[pc])
+            except (TypeError, ValueError):
+                continue
+            if (code, period, metric_key) in seen:
+                continue  # 多个"选项"重复时取首个（按报告期累计口径）
+            seen.add((code, period, metric_key))
+            rows.append({"code": code, "period": period, "metric_key": metric_key,
+                         "value": val, "unit": METRIC_UNIT[metric_key]})
     return rows
 
 

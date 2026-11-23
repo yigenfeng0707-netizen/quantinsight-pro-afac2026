@@ -187,8 +187,7 @@ streamlit_app/
 ├── features/                           # 业务功能模块（13个）
 │   ├── __init__.py
 │   ├── shap_explainer.py               # ⭐ SHAP 可解释性（业内独家）
-│   ├── report_generator.py             # 📄 6段式自动报告
-│   ├── report_exporter.py              # 📤 Word/PDF 导出
+│   ├── report_generator.py             # 📄 6段式自动报告（含 Word 导出）
 │   ├── dashboard_v2.py                 # 📊 实时数据看板V2
 │   ├── robust_utils.py                 # 🛡️ 鲁棒性工具（重试+超时+回退）
 │   ├── stock_screener.py               # 🤖 智能选股

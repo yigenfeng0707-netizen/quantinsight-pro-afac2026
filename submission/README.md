@@ -1,6 +1,6 @@
 # AFAC2026 初创组 — QuantInsight Pro 提交包索引
 
-> **📌 V2 头注** · **编制日期：2026-07-08** · **版本状态：V2（最终冲刺版）**
+> **📌 V2 头注** · **编制日期：2026-07-08** · **版本状态：V2（最终冲刺版）** · **2026-11-19 修订：视频相关条目按实测口径更正（详见各处 ⚠ 标注）**
 >
 > ⚠ **数据统一 T35 修正：HS300 8.56%（修正前 19.22% 旧值）**
 
@@ -26,7 +26,7 @@ delivery/
 ├── 04_答辩材料/                    ← 5 docx
 ├── 05_自评与评分/                  ← 自评打分报告
 ├── 06_图表素材/                    ← 7 PNG
-├── 07_视频/                        ← 视频（1 已就绪 + 2 待渲染）
+├── 07_视频/                        ← 视频（⚠ 当前工作树为空；V1 成片在提交包 ZIP 内，最新 282s 成片在 visualization/output/，待归档）
 ├── 08_锦上添花/                    ← 海报 + 易拉宝 + 永字背书
 ├── 09_代码仓库/                    ← GitHub URL
 ├── 10_完整提交包/                  ← 一站式 ZIP
@@ -42,7 +42,7 @@ python scripts/_build_delivery.py
 
 ## 🆕 V2 新增交付物（最终冲刺物料 · 2026-07-08 状态）
 
-> 本节列出 V2 版本中新增/升级的所有交付物（7 图 / 2 视频 / 5 Word / 5 杀手锏 / 3 锦上添花 / 1 ZIP）。
+> 本节列出 V2 版本中新增/升级的所有交付物（7 图 / 1 段视频成片 / 5 Word / 5 杀手锏 / 3 锦上添花 / 1 ZIP）。
 
 ### 🖼️ H1. 7 张图 PNG（`03_正式文档_WORD/_assets/`）
 
@@ -56,13 +56,13 @@ python scripts/_build_delivery.py
 | 6 | [`06_customer_subscription_matrix.png`](03_正式文档_WORD/_assets/06_customer_subscription_matrix.png) | 客户订阅矩阵 |
 | 7 | [`07_team_structure.png`](03_正式文档_WORD/_assets/07_team_structure.png) | 团队组织架构 |
 
-### 🎬 H2. 2 段视频
+### 🎬 H2. 视频交付（2026-11-19 实测口径）
 
 | # | 文件名 | 用途 | 状态 |
 |---|--------|------|------|
-| 1 | [`02_Demo交付/QuantInsight_Pro_Demo_3min.mp4`](02_Demo交付/QuantInsight_Pro_Demo_3min.mp4) | 3 分钟产品 Demo 视频（V1 终版） | ✅ 完成 |
-| 2 | [`02_Demo交付/QuantInsight_Pro_Demo_3min_V2.mp4`](02_Demo交付/) | 3 分钟产品 Demo 视频（V2 修订版） | ⏳ 即将生成 |
-| 3 | [`QuantInsight_Pro_Pitch_5min_V1.mp4`](QuantInsight_Pro_Pitch_5min_V1.mp4) | 5 分钟路演 Pitch 视频 V1 | ⏳ 即将生成 |
+| 1 | ZIP 内 `02_Demo交付/QuantInsight_Pro_Demo_3min.mp4`（即 `delivery/07_视频/QuantInsight_Pro_Demo_3min_V1_终版.mp4` 副本） | V1 终版成片 | ✅ **已随 2026-07-08 提交包 ZIP 交付**；实测 174.45s（≈2 分 54 秒）、5.87 MB——7 月文档写「180s / 9.3 MB」与实测不符，已更正；⚠ 当前工作树 `02_Demo交付/` 内无此文件（V3 重置时归档清理） |
+| 2 | `../visualization/output/qi_demo.mp4` | **最新成片**（4 分 42 秒） | ✅ 2026-11-14 渲染，282s、10.8 MB、1920×1080 30fps、烧录字幕，抽帧核验为真实运行 UI；待归档进提交包 |
+| 3 | 3 分钟 V2 修订版 / 5 分钟路演 Pitch | 未产出 | ⏳ 未生成（7 月版写「即将生成」，至今未做） |
 
 ### 📄 H3. 5 份答辩 Word
 
@@ -96,7 +96,7 @@ python scripts/_build_delivery.py
 
 | 文件名 | 用途 |
 |--------|------|
-| `QuantInsight_Pro_AFAC2026_提交包_V2_20260708.zip` | **V2 最终提交包**（含全部 V2 物料：7 图 / 2 视频 / 5 Word / 5 杀手锏 / 3 P2 物料 / 9 正式 Word / BP / 测试报告） |
+| `QuantInsight_Pro_AFAC2026_提交包_V2_20260708.zip` | **V2 最终提交包**（7 图 / **1 段视频成片 2 处副本** / 5 Word / 5 杀手锏 / 3 P2 物料 / 9 正式 Word / BP / 测试报告；实测 163 个文件） |
 
 > 打包命令：`python scripts/build_submission_zip.py --version V2`
 
@@ -113,11 +113,11 @@ python scripts/_build_delivery.py
 | 2 | 商业计划书 (可打印 HTML) | [`01_商业计划书_QuantInsight_Pro.html`](01_商业计划书_QuantInsight_Pro.html) | ✅ 完成 |
 | 3 | Demo 运行指南 | [`02_Demo交付/README_运行指南.md`](02_Demo交付/README_运行指南.md) | ✅ 完成 |
 | 4 | Windows 一键启动 | [`02_Demo交付/启动Demo.bat`](02_Demo交付/启动Demo.bat) | ✅ 完成 |
-| 5 | 3 分钟演示视频（V1 终版） | [`02_Demo交付/QuantInsight_Pro_Demo_3min.mp4`](02_Demo交付/QuantInsight_Pro_Demo_3min.mp4) | ✅ V3 电影级（179.9s，~3.0 MB，无字幕+BGM） |
-| 5b | 3 分钟演示视频（V2 修订版） | [`02_Demo交付/QuantInsight_Pro_Demo_3min_V2.mp4`](02_Demo交付/) | ⏳ 即将生成（H2） |
-| 6 | Demo 录制脚本 V4 | [`02_Demo交付/AFAC_Demo_录制脚本_V4.md`](02_Demo交付/AFAC_Demo_录制脚本_V4.md) | ✅ 8 幕 · 180s · SSML |
-| 6b | 视频状态 | [`02_Demo交付/VIDEO_STATUS.md`](02_Demo交付/VIDEO_STATUS.md) | ✅ ffprobe 验证 |
-| 6c | 旧版脚本（参考） | [`02_Demo交付/Demo视频制作脚本_3min.md`](02_Demo交付/Demo视频制作脚本_3min.md) | 📄 已被 V4 取代 |
+| 5 | 演示视频（V1 终版） | ZIP 内 `02_Demo交付/QuantInsight_Pro_Demo_3min.mp4` | ⚠ 实测 174.45s / 5.87 MB；工作树 `02_Demo交付/` 当前无 MP4（详见 H2 表） |
+| 5b | 最新成片（4 分 42 秒） | [`../visualization/output/qi_demo.mp4`](../visualization/output/qi_demo.mp4) | ✅ 282s，2026-11-14 渲染，待归档 |
+| 6 | Demo 录制脚本 V4 | [`02_Demo交付/AFAC_Demo_录制脚本_V4.md`](02_Demo交付/AFAC_Demo_录制脚本_V4.md) | ✅ 完成 |
+| 6b | 视频状态 | [`02_Demo交付/VIDEO_STATUS.md`](02_Demo交付/VIDEO_STATUS.md) | ⚠ 2026-11-19 已修订（原 V3 179.9s「已交付」声称与实物不符） |
+| 6c | 旧版脚本（参考） | `Demo视频制作脚本_3min.md` | 📄 已归档，工作树中不存在 |
 | 7 | 交互设计 HTML | [`02_Demo交付/交互设计与流程图.html`](02_Demo交付/交互设计与流程图.html) | ✅ 完成 |
 | 8 | 逻辑流程图 (Mermaid) | [`02_Demo交付/逻辑流程图.md`](02_Demo交付/逻辑流程图.md) | ✅ 完成 |
 | 9 | POC 实验数据包 | [`02_Demo交付/POC实验数据/`](02_Demo交付/POC实验数据/) | ✅ 完成 |
@@ -125,7 +125,7 @@ python scripts/_build_delivery.py
 | 11 | **正式 Word 文档包** | [`03_正式文档_WORD/`](03_正式文档_WORD/) | ✅ 9 份 DOCX + 富文本 v2 |
 | 11b | **AFAC 自评打分报告** | [`07_AFAC2026_自评打分报告.docx`](07_AFAC2026_自评打分报告.docx) | ✅ 六维 86 分 |
 | 12 | 生产级测试报告 | [`03_正式文档_WORD/02_生产级测试报告.docx`](03_正式文档_WORD/02_生产级测试报告.docx) | ✅ 21/21 通过 |
-| 13 | AFAC 规则对照自评 | [`03_正式文档_WORD/01_AFAC2026_规则对照与评分自评.docx`](03_正式文档_WORD/01_AFAC2026_规则对照与评分自评.docx) | ✅ 自评 88 分 |
+| 13 | AFAC 规则对照自评 | [`03_正式文档_WORD/01_AFAC2026_规则对照与评分自评.docx`](03_正式文档_WORD/01_AFAC2026_规则对照与评分自评.docx) | ✅ 自评 86 分（2026-11-19 统一口径，原写 88 分） |
 | 14 | **提交材料总览** | [`03_正式文档_WORD/00_AFAC2026_提交材料总览.docx`](03_正式文档_WORD/00_AFAC2026_提交材料总览.docx) | ✅ 平台对照 |
 
 ---
@@ -187,13 +187,14 @@ AFAC 标准八章节结构：
 | 本地启动 | 双击 `02_Demo交付/启动Demo.bat` |
 | 验证结果 | `app.py` 语法通过 · 回测引擎 7/7 测试通过 |
 
-### 2b. 3 分钟演示视频
+### 2b. 演示视频（2026-11-19 实测口径）
 
 | 项目 | 状态 |
 |------|------|
-| 分镜脚本 | ✅ `Demo视频制作脚本_3min.md` |
-| SRT 字幕素材 | ✅ 仓库根目录 4 个 .srt 文件 |
-| MP4 成品 | ✅ `02_Demo交付/QuantInsight_Pro_Demo_3min.mp4`（180s，~9.3 MB） |
+| 分镜脚本 | ✅ `AFAC_Demo_录制脚本_V4.md` |
+| SRT 字幕素材 | ⚠ 工作树中无 .srt 文件（7 月版写「根目录 4 个 .srt」与实测不符）；最新成片字幕已烧录进画面 |
+| MP4 成品（已提交） | ✅ 提交包 ZIP 内 V1 成片，实测 174.45s / 5.87 MB |
+| MP4 成品（最新） | ✅ [`../visualization/output/qi_demo.mp4`](../visualization/output/qi_demo.mp4)，282s / 10.8 MB / 1920×1080 / 烧录字幕，2026-11-14 渲染，抽帧核验真实 UI；待归档 |
 
 ### 2c. 交互设计与流程图
 
@@ -245,16 +246,16 @@ AFAC 标准八章节结构：
 - [x] POC 数据包完整
 - [x] **Word 文档包 7 份**（`03_正式文档_WORD/`）
 - [x] **生产级测试 21/21 通过**
-- [x] **3 分钟 MP4 视频（V1 终版）** — `02_Demo交付/QuantInsight_Pro_Demo_3min.mp4`（180s，~9.3 MB）
+- [x] **演示视频**：V1 成片已随 ZIP 提交（实测 174.45s）；最新 282s 成片在 `../visualization/output/qi_demo.mp4`，待归档
 - [ ] BP PDF（可选：HTML 或 Word 另存为 PDF）
 - [x] **HTTPS Demo**（https://3blue1brownlab.cn，复用旧域名 SSL）
 
 ### V2 新增检查项（最终冲刺）
 
 - [x] **H1 7 张图 PNG**（`03_正式文档_WORD/_assets/` 全部就位）
-- [x] **H2a 3 分钟 Demo V1 终版** MP4（已完成）
-- [ ] **H2b 3 分钟 Demo V2 修订版** MP4（即将生成）
-- [ ] **H2c 5 分钟路演 Pitch V1** MP4（即将生成）
+- [x] **H2a Demo 成片**（V1 已随 ZIP 提交；最新 282s 成片待归档进提交包）
+- [ ] **H2b 3 分钟 Demo V2 修订版** MP4（未生成）
+- [ ] **H2c 5 分钟路演 Pitch V1** MP4（未生成）
 - [ ] **H3 5 份答辩 Word**（即将生成）
 - [ ] **H4 5 杀手锏 docx**（即将生成）
 - [ ] **H5a A1 海报**（即将生成）
@@ -268,7 +269,7 @@ AFAC 标准八章节结构：
 
 | 优先级 | 事项 | 建议方式 |
 |--------|------|----------|
-| P0 | ~~录制 3 分钟 Demo 视频~~ | ✅ 已完成（见 `02_Demo交付/QuantInsight_Pro_Demo_3min.mp4`） |
+| P0 | ~~录制 Demo 视频~~ | ✅ V1 成片已随 2026-07-08 ZIP 提交（174.45s）；最新 282s 成片待归档（见 H2 表） |
 | P1 | 导出 BP PDF | 浏览器打开 `01_商业计划书_QuantInsight_Pro.html` → 打印为 PDF |
 | P2 | 本地 Demo 实测 | 双击 `启动Demo.bat` 确认页面加载 |
 
@@ -284,11 +285,11 @@ submission/
 ├── 02_Demo交付/
 │   ├── README_运行指南.md
 │   ├── 启动Demo.bat
-│   ├── Demo视频制作脚本_3min.md
+│   ├── Demo视频制作脚本_3min.md             ← 已归档，工作树不存在
+│   ├── AFAC_Demo_录制脚本_V4.md
 │   ├── 交互设计与流程图.html
 │   ├── 逻辑流程图.md
-│   ├── QuantInsight_Pro_Demo_3min.mp4       ← 已完成（180s，V1 终版）
-│   ├── QuantInsight_Pro_Demo_3min_V2.mp4   ← 即将生成（V2 修订版）
+│   ├── （无 MP4 — V1 成片在提交包 ZIP 内；最新 282s 成片在 ../visualization/output/qi_demo.mp4）
 │   └── POC实验数据/
 │       ├── README.md
 │       ├── POC实验报告.md

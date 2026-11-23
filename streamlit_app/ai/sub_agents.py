@@ -441,6 +441,17 @@ class AnalysisAgent:
                         }
                         for c in grounded.get("computed", [])
                     ]
+                    # 财务接地命中 -> sqlite:financials 引用（T10 评测 CP/CR 依赖此 source 标识）
+                    grounded_citations += [
+                        {
+                            "source": "sqlite:financials",
+                            "api_name": "financials",
+                            "description": c.get("description", ""),
+                            "date": c.get("date", ""),
+                            "data_snippet": f"answer={c.get('answer')}",
+                        }
+                        for c in grounded.get("financial_hits", [])
+                    ]
                 except Exception:
                     pass
 

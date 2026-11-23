@@ -109,15 +109,32 @@ class SentimentAnalyzer:
                 timestamp=timestamp or datetime.now().isoformat(),
             )
 
-        # SnowNLP 情感打分
+        # 情感打分：金融领域词表优先，SnowNLP 兜底
+        # SnowNLP 语料为书评，对金融文本（"暴跌/出逃"判正面）误判率高；
+        # 命中领域词表时混合打分并钳制方向，未命中时退回 SnowNLP。
+        rule_score = self._rule_based_score(text)
+        rule_total = sum(1 for w in self.POSITIVE_WORDS if w in text) \
+            + sum(1 for w in self.NEGATIVE_WORDS if w in text)
+        snow_score = None
         if self.use_snownlp:
             try:
-                s = SnowNLP(text)
-                score = s.sentiments  # 0-1, 越接近1越正面
+                snow_score = SnowNLP(text).sentiments  # 0-1, 越接近1越正面
             except Exception:
-                score = self._rule_based_score(text)
+                snow_score = None
+
+        if rule_total > 0 and snow_score is not None:
+            # 领域词表更可靠：0.6 权重 + SnowNLP 0.4
+            score = 0.6 * rule_score + 0.4 * snow_score
+            pos = sum(1 for w in self.POSITIVE_WORDS if w in text)
+            neg = sum(1 for w in self.NEGATIVE_WORDS if w in text)
+            if neg > 0 and pos == 0:
+                score = min(score, 0.35)   # 纯负面词：强制负面区间
+            elif pos > 0 and neg == 0:
+                score = max(score, 0.65)   # 纯正面词：强制正面区间
+        elif rule_total > 0:
+            score = rule_score
         else:
-            score = self._rule_based_score(text)
+            score = snow_score if snow_score is not None else 0.5
 
         # 标签
         if score >= 0.6:

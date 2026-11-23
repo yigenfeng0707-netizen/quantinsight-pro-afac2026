@@ -20,6 +20,51 @@ import numpy as np
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
+
+def _cached_data_date() -> Optional[str]:
+    """读 qi_data.db.data_meta，返回本地缓存的数据日期（YYYY-MM-DD 或时间）。
+
+    看板降级到演示/缓存口径时，用真实落库时间替换 datetime.now()，
+    避免"更新时间=当前时刻"误导评委对数据新鲜度的判断。
+    """
+    try:
+        from features.sqlite_data_layer import QIDataDB
+        db = QIDataDB()
+        with db._get_conn() as conn:
+            # 行情类表的落库时间最能代表"市场数据新到哪天"；
+            # 静态演示表（concept_board 等）刷新时间不代表行情新鲜度。
+            row = conn.execute(
+                "SELECT last_updated FROM data_meta "
+                "WHERE table_name IN ('stock_spot', 'stock_history', 'macro_snapshot') "
+                "ORDER BY last_updated DESC LIMIT 1"
+            ).fetchone()
+            if not row:
+                row = conn.execute(
+                    "SELECT last_updated FROM data_meta ORDER BY last_updated DESC LIMIT 1"
+                ).fetchone()
+        if row and row[0]:
+            ts = str(row[0])
+            # 兼容 'YYYY-MM-DDTHH:MM:SS' 与 'YYYY-MM-DD HH:MM:SS'
+            return ts.replace('T', ' ') if 'T' in ts else ts
+    except Exception:
+        pass
+    return None
+
+
+def _data_caliber_caption(source: str) -> str:
+    """数据源徽章 + 口径日期（本地缓存时显示真实数据日期）。"""
+    if source == 'akshare':
+        return f"数据源: 🟢 真实akshare数据（实时） | 刷新时间: {datetime.now().strftime('%H:%M:%S')}"
+    date_str = _cached_data_date()
+    if source in ('sqlite', 'static_demo', 'demo') or source == 'unknown':
+        if date_str:
+            return (
+                f"数据源: 🟦 本地库缓存({source}) · 数据日期 {date_str} · "
+                "实时接口暂不可用时保质呈现"
+            )
+        return "数据源: 🟡 演示数据(高质量模拟) · 非实时"
+    return f"数据源: {source}"
+
 # 量化配色
 COLORS = {
     'primary': '#0A1628',
@@ -310,10 +355,9 @@ def render_dashboard():
     macro['up_count'] = breadth.get('advance', 0)
     macro['down_count'] = breadth.get('decline', 0)
 
-    # 数据源标识
+    # 数据源标识（含真实数据日期，避免"当前时刻"误导口径判断）
     source = macro.get('source', 'unknown')
-    badge = '🟢 真实akshare数据' if source == 'akshare' else '🟡 演示数据(高质量模拟)'
-    st.caption(f"数据源: {badge} | 更新时间: {datetime.now().strftime('%H:%M:%S')}")
+    st.caption(_data_caliber_caption(source))
 
     # 1. 大盘指数卡片
     render_index_cards(macro)

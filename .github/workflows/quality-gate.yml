@@ -1,0 +1,76 @@
+# 质量门禁：push / PR 时跑 production_check 六道门禁
+# G1 语义层自测 / G2 评测回归 / G3 接地冒烟 / G4 数据质量 / G5 本体一致性 / G6 模型注册表
+# 任一 FAIL 即非零退出 → PR 检查失败，阻止回归合入。
+# 本地等价命令：python scripts/production_check.py
+
+name: Quality Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'streamlit_app/**'
+      - 'scripts/production_check.py'
+      - '.github/workflows/quality-gate.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  production-check:
+    # 仓库守卫：仅源仓库执行（fork 的 PR 触发时跑各自副本，互不干扰）
+    if: github.repository == 'yigenfeng0707-netizen/quantinsight-pro-afac2026'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install --no-cache-dir -r streamlit_app/requirements.txt
+
+      - name: Run production gate (G1–G6)
+        run: |
+          python scripts/production_check.py --json gate_result.json
+        continue-on-error: false
+
+      - name: Upload gate result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-gate-result
+          path: gate_result.json
+          if-no-files-found: warn
+
+      - name: Gate summary (PR comment friendly)
+        if: always()
+        run: |
+          python - <<'EOF'
+          import json, sys
+          try:
+              d = json.load(open('gate_result.json'))
+          except Exception as e:
+              print(f'::warning::无法读取 gate_result.json: {e}')
+              sys.exit(0)
+          gates = d.get('gates', d if isinstance(d, list) else [])
+          print('| 门禁 | 状态 | 耗时 | 说明 |')
+          print('|------|------|------|------|')
+          for g in gates:
+              gid = g.get('id', g.get('gid', '?'))
+              st = g.get('status', '?')
+              dur = g.get('duration_s', g.get('duration', 0))
+              detail = (g.get('detail') or '').replace('|', '\\|')[:80]
+              icon = {'PASS': '✅', 'FAIL': '❌', 'WARN': '⚠️', 'SKIP': '⏭️'}.get(st, '')
+              print(f'| {gid} | {icon} {st} | {dur}s | {detail} |')
+          fails = [g.get('id', g.get('gid')) for g in gates if g.get('status') == 'FAIL']
+          if fails:
+              print(f'::error::门禁 FAIL: {", ".join(fails)}')
+          EOF

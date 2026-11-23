@@ -363,13 +363,25 @@ class DataGrounder:
 
         hits = []
         conn = self.qi_db._get_conn()
+        # 财务指标题（如"平安银行2025年年报营收"）不应回退最新行情：
+        # 答案落在 financials 表，最新 K 线引用是夹带噪声（评测 CP 假阳性来源）。
+        skip_latest_fallback = False
+        if not dates:
+            try:
+                from semantic.layer import get_parser
+                skip_latest_fallback = any(
+                    m.binding_table == "financials"
+                    for m in get_parser().parse(question)
+                )
+            except Exception:
+                pass
         for code in codes:
             if dates:
                 for date in dates:
                     row = conn.execute(sql_point, (code, date)).fetchone()
                     if row:
                         hits.append(dict(zip(cols, row)))
-            else:
+            elif not skip_latest_fallback:
                 row = conn.execute(sql_latest, (code,)).fetchone()
                 if row:
                     hits.append(dict(zip(cols, row)))

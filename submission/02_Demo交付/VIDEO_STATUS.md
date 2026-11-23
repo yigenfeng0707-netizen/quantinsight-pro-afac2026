@@ -1,89 +1,34 @@
-# 视频状态说明 · V3 Cinematic
+# 视频状态说明（2026-11-19 实测口径）
 
-**目标文件**：`QuantInsight_Pro_Demo_3min.mp4`  
-**状态**：✅ **V3 电影级交付**（2026-07-08 从零重置）
+> ⚠ **修订声明**：本文件 7 月版声称「V3 电影级成片 179.9s 已交付且 ffprobe 验证」，但对应 MP4 文件在当前工作树中不存在，属失实陈述，已于 2026-11-19 整体重写为实测口径。旧版内容以归档为准。
 
-| 项目 | 值 |
-|------|-----|
-| 脚本 | `AFAC_Demo_电影级脚本_V3.md`（8 幕 · 180s · SSML 抑扬顿挫） |
-| 管线 | `scripts/afac_cinematic_demo_v3.py` |
-| 分辨率 | 1920×1080 |
-| 时长 | **179.91 s**（目标 180±3s ✅） |
-| 音画差 | **0.01 s**（video 179.87s / audio 179.86s ✅） |
-| 文件大小 | ~3.0 MB（3,126,154 字节） |
-| 旁白 | edge-tts `zh-CN-YunxiNeural` + SSML prosody |
-| 配乐 | Chopin Nocturne Op.9 No.2（CC0，-20 dB） |
-| 字幕 | **无烧录字幕** |
+## 一、成片事实清单（三级口径，均已实测）
 
-## ffprobe 验证（2026-07-08 V3）
+| # | 成片 | 位置 | 实测参数 | 状态 |
+|---|------|------|----------|------|
+| 1 | **V1 终版**（已随 2026-07-08 提交包 ZIP 交付 AFAC） | ZIP `QuantInsight_Pro_AFAC2026_提交包_20260708_V2.zip` 内 `submission/02_Demo交付/QuantInsight_Pro_Demo_3min.mp4`（副本：`delivery/07_视频/QuantInsight_Pro_Demo_3min_V1_终版.mp4`） | ffprobe 实测 **174.45s**，5.87 MB——7 月文档写「180s / 9.3 MB」与实测不符 | ✅ 已提交（ZIP 内可验证） |
+| 2 | **最新成片**（4 分 42 秒） | `quantinsight-deploy/visualization/output/qi_demo.mp4` | ffprobe 实测 **282s**，10.8 MB，1920×1080 @30fps，烧录中文字幕；抽帧核验（30s/180s 处）均为真实运行 UI（AI 投研问答页、量化策略回测页），非摆拍 | ✅ 已产出，**待归档进提交包** |
+| 3 | **≥300s 六幕新版**（目标：加入边界拒答与口径收束幕） | 目标路径 `学术加速计划/演示视频/QuantInsightPro_Demo_AFAC2026.mp4` | 渲染管线：CDP 页面级抓帧（0.15s/帧）+ edge-tts 旁白 + 程序化配乐 + ffmpeg 合成 | ⏳ **未完成**：截至 2026-11-18 共 6 次运行均失败，卡点均为登录环节（表单超时 / DOM 注入假成功 / 登录后跳转超时），待改用 session cookie 注入方案重跑 |
 
-```json
-{
-  "format": { "duration": "179.914062", "size": "3126154" },
-  "video": { "width": 1920, "height": 1080, "duration": "179.872031" },
-  "audio": { "duration": "179.861000" },
-  "delta": "0.01s"
-}
-```
+## 二、当前工作树实况
 
-## 功能覆盖
+- `02_Demo交付/` 目录内**无任何 MP4/SRT 文件**（V3 重置时旧产物已归档清理）
+- `delivery/07_视频/` 工作树目录为空（ZIP 内副本不受影响）
+- 仓库内无 `.srt` 文件（7 月版 README 写「4 个 .srt」与实测不符）；最新成片字幕已烧录进画面
 
-| 场景 | 时间 | 状态 |
-|------|------|------|
-| Act 1 片头品牌 | 5s | ✅ 品牌标题卡 #0A0E27/#00D4FF |
-| Act 2 行业痛点 | 12s | ✅ 叙事标题卡 |
-| Act 3 智能选股 | 33s | ✅ 旁白 + UI 录制 |
-| Act 4 SHAP | 33s | ✅ 旁白 + UI 录制 |
-| Act 5 AI 问答 | 27s | ✅ 旁白 + UI 录制 |
-| Act 6 回测 | 27s | ✅ 旁白 + UI 录制 |
-| Act 7 落地+团队 | 18s | ✅ 永字 + 4 人团队 |
-| Act 8 CTA | 25s | ✅ URL + 项目编号 |
+## 三、待办
 
-## 已完成的重置
+1. **归档**：将 `visualization/output/qi_demo.mp4` 复制入 `02_Demo交付/` 与 `delivery/07_视频/`，替换/并存 V1 成片
+2. **重渲染 ≥300s 版**：修复登录环节（优先方案：CDP `Network.setCookie` 注入已登录 session，绕过表单真实输入），成功后逐幕抽帧目检 + ffprobe 时长断言 ≥300s
+3. 重打包提交 ZIP，使 ZIP 与工作树口径一致
 
-- ✅ 旧 MP4/SRT/变体 → `archive/legacy_video/`
-- ✅ demo-output 旧产物清空
-- ✅ remotion media 清空（结构保留）
-- ✅ 旧 storyboard / 脚本 / VIDEO_STATUS 归档
-- ✅ 新 V3 脚本 + 管线 + 唯一交付 MP4
-
-## 重新生成
+## 四、实测验证方法（可复现）
 
 ```powershell
-cd quantinsight-deploy
-pip install edge-tts Pillow
-cd streamlit_app && npm install playwright && npx playwright install chromium
-cd ..
-$env:DEMO_PASSWORD = "<Demo 登录密码>"
-python scripts/afac_cinematic_demo_v3.py --target production
-```
-
-## 诚实质量评估
-
-| 维度 | 目标 | V3 达成 |
-|------|------|---------|
-| 180s ±3s | ✅ | ✅ 179.91s |
-| 音画同步 ≤3s | ✅ | ✅ 0.01s |
-| 无烧录字幕 | ✅ | ✅ |
-| SSML 抑扬顿挫旁白 | ✅ | ✅ 8 幕独立 SSML |
-| 钢琴 BGM + 人声混音 | ✅ | ✅ -20dB amix |
-| 品牌标题卡 | ✅ | ✅ 4 幕 cinematic title |
-| 场景 fade 转场 | ✅ | ✅ per-segment fade in/out |
-| UI zoompan | ✅ | ✅ browser 场景 |
-| 单次 Playwright 新录 | 理想 | ⚠ 首次构建使用已归档 production webm（Playwright Chromium 下载中）；运行完整管线可刷新 |
-
-### 与「电影级」理想的差距
-
-- 当前转场为 segment fade，非 xfade 链式叠化（稳定性优先）
-- Browser 素材可 `--target production` 无 `--skip-record` 重录刷新
-- 文件 3.0MB 偏小（高压缩）；可降 CRF 提升画质
-
-## 旧脚本（已归档，勿用）
-
-见 `archive/legacy_video/README.md`
-
-## 打包
-
-```powershell
-python scripts/build_submission_zip.py
+# ZIP 内 V1 成片时长
+python -c "import zipfile; z=zipfile.ZipFile(r'quantinsight-deploy\submission\QuantInsight_Pro_AFAC2026_提交包_20260708_V2.zip'); print(z.getinfo('submission/02_Demo交付/QuantInsight_Pro_Demo_3min.mp4').file_size)"
+# 最新成片参数
+ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1 "quantinsight-deploy\visualization\output\qi_demo.mp4"
+# 抽帧目检
+ffmpeg -y -ss 30 -i "quantinsight-deploy\visualization\output\qi_demo.mp4" -frames:v 1 check_f30.png
 ```

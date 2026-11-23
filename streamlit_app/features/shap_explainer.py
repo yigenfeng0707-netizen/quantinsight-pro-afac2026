@@ -613,12 +613,26 @@ def render_shap_dashboard(auto_run: bool = False):
         if not st.button("🚀 开始 SHAP 分析", type="primary", key="shap_run_btn"):
             return
 
-    # 加载数据 + 训练
+    # 加载数据 + 训练（兜底：依赖缺失/数据异常时给出可读提示而非整页 crash）
     with st.spinner("正在加载因子数据并训练模型..."):
-        df = load_factor_data(n_stocks=n_stocks)
-        model, metrics_df, feature_cols = train_xgboost_model(df)
-        X = df[feature_cols].fillna(0)
-        shap_result = compute_shap_values(model, X, feature_cols)
+        try:
+            df = load_factor_data(n_stocks=n_stocks)
+            model, metrics_df, feature_cols = train_xgboost_model(df)
+            X = df[feature_cols].fillna(0)
+            shap_result = compute_shap_values(model, X, feature_cols)
+        except ImportError as e:
+            st.error(
+                f"❌ SHAP 分析依赖缺失：{e}。"
+                "请在部署环境执行 `pip install xgboost scikit-learn shap` 后重试。"
+            )
+            return
+        except Exception as e:
+            st.error(f"❌ 模型训练失败：{type(e).__name__}: {e}")
+            logger.exception("SHAP 训练失败")
+            return
+        if shap_result is None:
+            st.error("❌ SHAP 计算失败，请检查模型和数据")
+            return
 
     # 预测落日志（ml 闭环：监控页用 predictions_log 对齐实现收益）
     try:
@@ -663,16 +677,57 @@ def render_shap_dashboard(auto_run: bool = False):
 
     # 数据源标识
     data_source = df['data_source'].iloc[0]
-    source_badge = "🟢 真实akshare数据" if data_source == 'akshare_real' else "🟡 演示数据(高质量模拟)"
+    _src_badge = {
+        'akshare_real': "🟢 真实akshare数据",
+        'local_db_real': "🟢 本地库真实数据（生产闭环）",
+    }
+    source_badge = _src_badge.get(data_source, "🟡 演示数据(高质量模拟)")
     st.caption(f"数据源: {source_badge} | 样本数: {len(df)} | 特征数: {len(feature_cols)} | 训练方法: {shap_result['method']}")
 
     # 模型指标卡片
     st.markdown("#### 模型性能指标")
     m_cols = st.columns(5)
     for i, row in metrics_df.iterrows():
-        with m_cols[i]:
-            value_str = f"{row['value']:.4f}" if abs(row['value']) < 1 else f"{row['value']:.2f}"
+        with m_cols[i % len(m_cols)]:
+            raw = row['value']
+            # 注册模型路径的 value 是描述性字符串，现场训练路径是数值
+            if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+                try:
+                    value_str = f"{raw:.4f}" if abs(float(raw)) < 1 else f"{float(raw):.2f}"
+                except (TypeError, ValueError):
+                    value_str = str(raw)
+            else:
+                # 长文本（如 walk-forward IC 逐折明细）需要换行，避免卡片溢出
+                value_str = str(raw)
             st.metric(row['metric'], value_str)
+
+    # 预测→实现收益对齐速览（ml 闭环：predictions_log 对齐 stock_history 实现收益）
+    # 只读不改训练流程；样本不足（未跑过 SHAP 落库）时静默隐藏。
+    try:
+        from ml.monitor import evaluate_predictions
+        from features.sqlite_data_layer import QIDataDB
+        _mon = evaluate_predictions(QIDataDB())
+        if _mon is not None:
+            _ic = _mon['ic']
+            st.markdown("#### 🔄 预测 → 实现收益对齐（已兑现样本）")
+            _c1, _c2, _c3, _c4 = st.columns(4)
+            with _c1:
+                st.metric("命中率", f"{_mon['hit_rate']:.1%}",
+                          delta="方向有效" if _mon['hit_rate'] > 0.55 else "如实呈现")
+            with _c2:
+                st.metric("IC (Spearman)", f"{_ic:.4f}" if _ic is not None else "N/A")
+            with _c3:
+                st.metric("已兑现样本", f"{_mon['n_realized']} / {_mon['n_predictions']}")
+            with _c4:
+                st.metric("预测日期", str(_mon['asof_range'][1]))
+            st.caption(
+                f"口径：模型 {_mon['model_id']} 的 predictions_log，"
+                "对齐 stock_history 未来 20 日实现收益；"
+                "「信号验证中心 → 🧠 模型信号」可看逐月 IC 衰减曲线。"
+                "负 IC/命中率如实呈现，不修饰——这正是 walk-forward 注册时记录的同款口径。"
+            )
+    except Exception:
+        pass
 
     st.divider()
 

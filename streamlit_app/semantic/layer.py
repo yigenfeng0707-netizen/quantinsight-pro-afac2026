@@ -30,7 +30,8 @@ logger = logging.getLogger(__name__)
 
 QI = Namespace("http://quantinsight.pro/ontology/")
 SEMANTIC_DIR = Path(__file__).parent
-TTL_FILES = ("ontology.ttl", "metrics.ttl", "factors.ttl", "entities.ttl")
+TTL_FILES = ("ontology.ttl", "metrics.ttl", "factors.ttl", "entities.ttl",
+             "ml_models.ttl")  # 最后者为 ml.train 生成的模型血缘实例，可缺
 
 _CODE_RE = re.compile(r"(?<![A-Za-z0-9])(?:sh|sz|SH|SZ)?(\d{6})(?![0-9])")
 _DATE_RE = re.compile(r"(?<!\d)(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})")

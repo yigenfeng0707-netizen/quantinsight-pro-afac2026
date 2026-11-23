@@ -83,10 +83,27 @@ class TradeSimulator:
         elif "全部" in text or "清仓" in text:
             result["quantity"] = -1  # -1 表示全部
 
-        # 股票名称
-        name_match = re.search(r'([\u4e00-\u9fff]{2,6})(?!.*[\u4e00-\u9fff]{2,6})', text)
-        if name_match:
-            result["stock_name"] = name_match.group(1)
+        # 股票代码：6 位数字（优先级最高）
+        code_match = re.search(r'(?<!\d)(\d{6})(?!\d)', text)
+        if code_match:
+            result["stock_code"] = code_match.group(1)
+
+        # 股票名称：优先取数量词（"500股/1000股"）之后的中文片段；
+        # 其次取 "全部/清仓" 之后的中文片段；再次取动作词之后的中文片段。
+        # 排除以/市/价/全部 等非名称词开头，避免把指令词误当名称。
+        _name = ''
+        m = re.search(r'\d+\s*股\s*([\u4e00-\u9fff]{2,6})', text)
+        if not m:
+            m = re.search(r'(?:全部|清仓)\s*([\u4e00-\u9fff]{2,6})', text)
+        if not m:
+            m = re.search(r'(?:买入|卖出|加仓|建仓|减仓|止损)\s*(?:以[^，。 ]*?)?\s*(?:市价|限价)?\s*([\u4e00-\u9fff]{2,6})', text)
+        if m:
+            _name = m.group(1)
+        # "卖出全部宁德时代" 会被 "全部" 分支正确捕获；
+        # 若捕获到的是动作词本身（如"以市价卖出"）则丢弃
+        if _name and _name[:2] in ('买入', '卖出', '加仓', '建仓', '减仓', '止损', '全部', '清仓', '市价', '限价'):
+            _name = _name[2:] if len(_name) > 2 else ''
+        result["stock_name"] = _name
 
         return result
 
